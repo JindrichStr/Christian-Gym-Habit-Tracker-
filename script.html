@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gym Tracker">
+    <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Emoji_u1f4aa.svg/512px-Emoji_u1f4aa.svg.png">
+    
+    <title>Gym Habit Tracker</title>
+    
+    <style>
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #121212; 
+            color: #ffffff; 
+            padding: 10px; 
+            margin: 0;
+            padding-top: env(safe-area-inset-top, 20px); 
+        }
+        .container { 
+            max-width: 500px; 
+            margin: 0 auto; 
+            background: #1e1e1e; 
+            padding: 20px; 
+            border-radius: 12px; 
+            box-shadow: 0 4px 15px rgba(0,0,0,0.8); 
+            position: relative;
+        }
+        h2 { text-align: center; margin-top: 10px; color: #ff5722; margin-bottom: 5px; }
+        
+        /* Datum v rohu */
+        .current-date-corner {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 12px;
+            color: #888;
+            text-transform: capitalize;
+        }
+
+        .calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; margin-top: 20px;}
+        .calendar-header button { width: auto; margin: 0; padding: 5px 15px; background: #333; border: none; color: white; border-radius: 5px; cursor: pointer; font-size: 16px;}
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; text-align: center; margin-bottom: 20px; }
+        .day { background: #2c2c2c; padding: 10px 0; border-radius: 5px; cursor: pointer; font-size: 14px; transition: 0.2s; box-sizing: border-box; }
+        .day:hover { background: #444; }
+        
+        /* Skutečný dnešek - přidán bílý rámeček */
+        .day.today { border: 1px solid rgba(255, 255, 255, 0.5); }
+        
+        .day.active { background: #ff5722; color: white; font-weight: bold; border-color: #ff5722; }
+        .day.has-workout { border-bottom: 3px solid #ff9800; } 
+        .day.completed { border-bottom: 3px solid #4CAF50; }  
+        .day-name { font-weight: bold; color: #888; font-size: 12px; padding-bottom: 5px;}
+        
+        h3 { border-bottom: 1px solid #333; padding-bottom: 10px; margin-top: 0; margin-bottom: 5px; text-align: center;}
+        #dayStatus { text-align: center; margin-bottom: 15px; font-size: 15px; }
+
+        input[type="text"], input[type="number"], .btn-main { 
+            width: 100%; 
+            padding: 12px; 
+            margin-top: 10px; 
+            border-radius: 8px; 
+            border: none; 
+            box-sizing: border-box; 
+            font-size: 16px;
+        }
+        input { background: #2c2c2c; color: white; }
+        input::placeholder { color: #888; }
+        .btn-main { background: #ff5722; color: white; font-weight: bold; cursor: pointer; margin-top: 15px; }
+        .btn-main:hover { background: #e64a19; }
+        
+        ul { list-style-type: none; padding: 0; margin-top: 20px; }
+        li { background: #2c2c2c; margin-top: 10px; padding: 15px; border-radius: 8px; border-left: 5px solid #ff5722; }
+        .li-header { display: flex; justify-content: space-between; align-items: center; }
+        .exercise-info { color: #bbb; font-size: 14px; margin-bottom: 10px; margin-top: 2px;}
+        .sets-row { display: flex; gap: 15px; flex-wrap: wrap; margin-top: 10px;}
+        input[type="checkbox"] { width: 28px; height: 28px; cursor: pointer; accent-color: #ff5722; margin: 0; }
+        .done-text { text-decoration: line-through; color: #777; }
+        
+        .delete-btn { background: #d32f2f; color: white; border: none; width: 35px; height: 35px; border-radius: 50%; cursor: pointer; font-weight: bold; }
+        .delete-btn:hover { background: #b71c1c; }
+
+        #toast {
+            visibility: hidden;
+            min-width: 250px;
+            max-width: 90%;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 8px;
+            padding: 16px;
+            position: fixed;
+            z-index: 100;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            font-size: 15px;
+            border-left: 5px solid #4CAF50;
+            box-shadow: 0px 4px 15px rgba(0,0,0,0.8);
+            opacity: 0;
+            transition: opacity 0.5s, bottom 0.5s;
+            font-style: italic;
+            line-height: 1.4;
+        }
+        #toast.show { visibility: visible; opacity: 1; bottom: 50px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="current-date-corner" id="currentDateCorner"></div>
+        
+        <h2>💪 Gym Tracker</h2>
+        
+        <div class="calendar-header">
+            <button id="prevMonthBtn">&lt;</button>
+            <strong id="monthYearText" style="font-size: 18px;"></strong>
+            <button id="nextMonthBtn">&gt;</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+
+        <h3 id="selectedDateHeader">Trénink: Dnes</h3>
+        <div id="dayStatus"></div>
+        
+        <input type="text" id="exercise" placeholder="Název cviku (např. Dřep)">
+        <div style="display: flex; gap: 10px;">
+            <input type="number" id="sets" placeholder="Série (např. 4)">
+            <input type="number" id="reps" placeholder="Opáčka (např. 10)">
+        </div>
+        
+        <button id="addBtn" class="btn-main">Přidat do mého seznamu</button>
+
+        <ul id="workoutList"></ul>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            const exerciseInput = document.getElementById('exercise');
+            const setsInput = document.getElementById('sets');
+            const repsInput = document.getElementById('reps');
+            const workoutList = document.getElementById('workoutList');
+            const calendarGrid = document.getElementById('calendarGrid');
+            const monthYearText = document.getElementById('monthYearText');
+            const selectedDateHeader = document.getElementById('selectedDateHeader');
+            const dayStatus = document.getElementById('dayStatus');
+            const addBtn = document.getElementById('addBtn');
+            const prevMonthBtn = document.getElementById('prevMonthBtn');
+            const nextMonthBtn = document.getElementById('nextMonthBtn');
+            const toast = document.getElementById('toast');
+            const currentDateCorner = document.getElementById('currentDateCorner');
+            let toastTimeout;
+
+            // Vypsání aktuálního skutečného data do pravého horního rohu
+            const realTodayObj = new Date();
+            const dateOptions = { weekday: 'long', day: 'numeric', month: 'long' };
+            currentDateCorner.innerText = realTodayObj.toLocaleDateString('cs-CZ', dateOptions);
+
+            const bibleQuotes = [
+                "„Hospodin je můj pastýř, nebudu mít nedostatek.“ (Žalm 23:1)",
+                "„Obnovuje mou duši, provází mě po správných stezkách...“ (Žalm 23:3)",
+                "„I kdybych šel údolím stínu smrti, nebudu se bát zlého, neboť ty jsi se mnou.“ (Žalm 23:4)",
+                "„Tvůj prut a tvá hůl mě potěšují.“ (Žalm 23:4)",
+                "„Kdo přebývá v úkrytu Nejvyššího, nocuje ve stínu Všemohoucího.“ (Žalm 91:1)",
+                "„Říkám Hospodinu: Mé útočiště a má tvrz, můj Bůh, v něhož doufám.“ (Žalm 91:2)",
+                "„Svými perutěmi tě přikryje, pod jeho křídly nalezneš útočiště.“ (Žalm 91:4)",
+                "„Nebudeš se bát noční hrůzy ani šípu letícího ve dne.“ (Žalm 91:5)",
+                "„Svým andělům o tobě přikáže, aby tě střežili na všech tvých cestách.“ (Žalm 91:11)"
+            ];
+
+            let today = new Date();
+            let currentMonth = today.getMonth();
+            let currentYear = today.getFullYear();
+            
+            function getFormatDate(year, month, day) {
+                return `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+            }
+
+            // String pro skutečný dnešek (nemění se) a vybraný den
+            let realTodayStr = getFormatDate(realTodayObj.getFullYear(), realTodayObj.getMonth(), realTodayObj.getDate());
+            let selectedDate = realTodayStr;
+            
+            let masterList = [];
+            let dailyRecords = {};
+            
+            try {
+                let savedMaster = localStorage.getItem('gymMasterV2');
+                let savedDaily = localStorage.getItem('gymDailyV2');
+                if (savedMaster) masterList = JSON.parse(savedMaster);
+                if (savedDaily) dailyRecords = JSON.parse(savedDaily);
+            } catch (error) {
+                console.warn("Chyba při čtení paměti.", error);
+            }
+
+            function saveToStorage() {
+                try {
+                    localStorage.setItem('gymMasterV2', JSON.stringify(masterList));
+                    localStorage.setItem('gymDailyV2', JSON.stringify(dailyRecords));
+                } catch (error) {
+                    console.warn("Nelze uložit.");
+                }
+            }
+
+            function showEncouragement() {
+                clearTimeout(toastTimeout);
+                const randomQuote = bibleQuotes[Math.floor(Math.random() * bibleQuotes.length)];
+                toast.innerText = randomQuote;
+                toast.className = "show";
+                toastTimeout = setTimeout(() => {
+                    toast.className = toast.className.replace("show", "");
+                }, 4000);
+            }
+
+            function renderCalendar() {
+                calendarGrid.innerHTML = '';
+                const monthNames = ["Leden", "Únor", "Březen", "Duben", "Květen", "Červen", "Červenec", "Srpen", "Září", "Říjen", "Listopad", "Prosinec"];
+                monthYearText.innerText = `${monthNames[currentMonth]} ${currentYear}`;
+
+                const daysOfWeek = ['Po', 'Út', 'St', 'Čt', 'Pá', 'So', 'Ne'];
+                daysOfWeek.forEach(d => {
+                    let el = document.createElement('div');
+                    el.className = 'day-name';
+                    el.innerText = d;
+                    calendarGrid.appendChild(el);
+                });
+
+                let firstDay = new Date(currentYear, currentMonth, 1).getDay();
+                firstDay = firstDay === 0 ? 6 : firstDay - 1; 
+                let daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+                for(let i = 0; i < firstDay; i++) {
+                    calendarGrid.appendChild(document.createElement('div'));
+                }
+
+                for(let d = 1; d <= daysInMonth; d++) {
+                    let dayDiv = document.createElement('div');
+                    dayDiv.className = 'day';
+                    dayDiv.innerText = d;
+                    
+                    let dateStr = getFormatDate(currentYear, currentMonth, d);
+                    
+                    // Přidání třídy "today" pro skutečný dnešek
+                    if (dateStr === realTodayStr) dayDiv.classList.add('today');
+                    
+                    // Přidání třídy "active" pro vybraný den
+                    if (dateStr === selectedDate) dayDiv.classList.add('active');
+                    
+                    if (masterList.length > 0) {
+                        let dayData = dailyRecords[dateStr] || {};
+                        let totalSetsInDay = 0;
+                        let doneSetsInDay = 0;
+
+                        masterList.forEach(w => {
+                            let setsCount = parseInt(w.sets) || 1;
+                            totalSetsInDay += setsCount;
+                            let wData = dayData[w.id] || [];
+                            for(let i = 0; i < setsCount; i++) {
+                                if (wData[i] === true) doneSetsInDay++;
+                            }
+                        });
+                        
+                        if (totalSetsInDay > 0) {
+                            if (doneSetsInDay === totalSetsInDay) {
+                                dayDiv.classList.add('completed');
+                            } else if (doneSetsInDay > 0) {
+                                dayDiv.classList.add('has-workout');
+                            }
+                        }
+                    }
+
+                    dayDiv.addEventListener('click', () => {
+                        selectedDate = dateStr;
+                        updateAll();
+                    });
+                    
+                    calendarGrid.appendChild(dayDiv);
+                }
+            }
+
+            function renderWorkouts() {
+                workoutList.innerHTML = '';
+                
+                if (masterList.length === 0) {
+                    dayStatus.innerHTML = '<span style="color: #888;">Zatím nemáš vytvořený žádný seznam cviků. Přidej první! 👇</span>';
+                    return;
+                }
+
+                let currentDayData = dailyRecords[selectedDate] || {};
+                let totalSetsAll = 0;
+                let doneSetsAll = 0;
+                
+                masterList.forEach((workout) => {
+                    let setsCount = parseInt(workout.sets) || 1;
+                    totalSetsAll += setsCount;
+                    
+                    let workoutSetsData = currentDayData[workout.id] || [];
+                    let doneSetsThisWorkout = 0;
+                    let checkboxesHTML = '';
+                    
+                    for(let i = 0; i < setsCount; i++) {
+                        let isChecked = workoutSetsData[i] === true;
+                        if (isChecked) {
+                            doneSetsThisWorkout++;
+                            doneSetsAll++;
+                        }
+                        
+                        checkboxesHTML += `<input type="checkbox" class="set-check" data-id="${workout.id}" data-set="${i}" ${isChecked ? 'checked' : ''}>`;
+                    }
+
+                    let isAllDone = (doneSetsThisWorkout === setsCount);
+                    let textClass = isAllDone ? "done-text" : "";
+
+                    const li = document.createElement('li');
+                    li.innerHTML = `
+                        <div style="width: 100%;">
+                            <div class="li-header">
+                                <span class="${textClass}">
+                                    <strong style="font-size: 18px;">${workout.ex}</strong>
+                                </span>
+                                <button class="delete-btn" data-id="${workout.id}" title="Smazat ze seznamu">X</button>
+                            </div>
+                            <div class="exercise-info">${workout.sets} série × ${workout.reps} opáček</div>
+                            
+                            <div class="sets-row">
+                                ${checkboxesHTML}
+                            </div>
+                        </div>
+                    `;
+                    workoutList.appendChild(li);
+                });
+
+                if (doneSetsAll === totalSetsAll) {
+                    dayStatus.innerHTML = '<span style="color: #4CAF50; font-weight: bold;">✅ Všechny série splněny! Výborná práce.</span>';
+                } else if (doneSetsAll === 0) {
+                    dayStatus.innerHTML = '<span style="color: #888;">V tento den zatím nic neodcvičeno.</span>';
+                } else {
+                    dayStatus.innerHTML = `<span style="color: #ff9800; font-weight: bold;">⏳ V procesu (${doneSetsAll}/${totalSetsAll} sérií hotovo)</span>`;
+                }
+            }
+
+            function updateHeader() {
+                let splitDate = selectedDate.split('-');
+                let isItToday = (selectedDate === realTodayStr) ? 'Dnes' : `${splitDate[2]}. ${splitDate[1]}. ${splitDate[0]}`;
+                selectedDateHeader.innerText = `Trénink: ${isItToday}`;
+            }
+
+            function updateAll() {
+                updateHeader();
+                renderCalendar();
+                renderWorkouts();
+            }
+
+            addBtn.addEventListener('click', () => {
+                const ex = exerciseInput.value;
+                const sets = setsInput.value;
+                const reps = repsInput.value;
+
+                if (!ex || !sets || !reps || sets < 1) {
+                    alert('Vyplň všechna pole a dej aspoň 1 sérii!');
+                    return;
+                }
+
+                let newWorkout = { 
+                    id: Date.now().toString(), 
+                    ex: ex, 
+                    sets: sets, 
+                    reps: reps 
+                };
+                
+                masterList.push(newWorkout);
+                
+                exerciseInput.value = '';
+                setsInput.value = '';
+                repsInput.value = '';
+                
+                saveToStorage();
+                updateAll();
+            });
+
+            prevMonthBtn.addEventListener('click', () => {
+                currentMonth--;
+                if(currentMonth < 0) { currentMonth = 11; currentYear--; }
+                renderCalendar();
+            });
+
+            nextMonthBtn.addEventListener('click', () => {
+                currentMonth++;
+                if(currentMonth > 11) { currentMonth = 0; currentYear++; }
+                renderCalendar();
+            });
+
+            workoutList.addEventListener('click', (e) => {
+                if (e.target.classList.contains('set-check')) {
+                    let id = e.target.getAttribute('data-id');
+                    let setIndex = e.target.getAttribute('data-set');
+                    
+                    if (!dailyRecords[selectedDate]) dailyRecords[selectedDate] = {};
+                    if (!dailyRecords[selectedDate][id]) dailyRecords[selectedDate][id] = [];
+                    
+                    dailyRecords[selectedDate][id][setIndex] = e.target.checked;
+                    
+                    if (e.target.checked) {
+                        showEncouragement();
+                    }
+                    
+                    saveToStorage();
+                    updateAll();
+                }
+                
+                if (e.target.classList.contains('delete-btn')) {
+                    if(confirm("Opravdu chceš tento cvik smazat ze všech dnů?")) {
+                        let id = e.target.getAttribute('data-id');
+                        masterList = masterList.filter(w => w.id !== id);
+                        saveToStorage();
+                        updateAll();
+                    }
+                }
+            });
+
+            updateAll();
+        });
+    </script>
+</body>
+</html>
